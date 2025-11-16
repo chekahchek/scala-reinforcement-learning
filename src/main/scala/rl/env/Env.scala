@@ -8,4 +8,5 @@ trait Env[F[_]] {
   def step(action: Action): F[(State, Double, Boolean)] // State, Reward, Done
   def getActionSpace: F[List[Action]]
   def getState: F[State]
+  def renderState(state: State): F[String]
 }

@@ -3,12 +3,15 @@ package rl.agent
 import cats.effect.{IO, Ref}
 import rl.env.Env
 import scala.util.Random
+import rl.logging.BaseLogger
 
 class QLearning[E <: Env[IO]](val env: E,
-                qTable: Ref[IO, Map[Any, Double]],
-                learningRate: Double,
-                discountFactor: Double,
-                explorationRate: Double) {
+                              qTable: Ref[IO, Map[(E#State, E#Action), Double]],
+                              learningRate: Double,
+                              discountFactor: Double,
+                              explorationRate: Double,
+                              logger: BaseLogger[IO]
+                             ) {
 
   def act(state: env.State): IO[env.Action] = for {
     actionSpace <- env.getActionSpace
@@ -30,7 +33,7 @@ class QLearning[E <: Env[IO]](val env: E,
     reward = res._2
     done = res._3
     nextStateStr <- env.renderState(nextState)
-    _ <- IO.println(s"Agent took action: $action resulting in state: $nextStateStr, reward: ${res._2}, done: ${res._3}")
+    _ <- logger.debug(s"Agent took action: $action resulting in state: $nextStateStr, reward: ${res._2}, done: ${res._3}")
 
     qValues <- qTable.get
     actionSpace <- env.getActionSpace
@@ -65,7 +68,7 @@ class QLearning[E <: Env[IO]](val env: E,
       if (episode >= numEpisodes) IO.unit
       else for {
         _ <- runEpisode()
-        _ <- IO.println(s"Completed episode: ${episode + 1}")
+        _ <- logger.debug(s"Completed episode: ${episode + 1}")
         _ <- loop(episode + 1)
       } yield ()
     }
@@ -81,7 +84,9 @@ object QLearning {
   def apply[E <: Env[IO]](env: E,
                           learningRate: Double = 0.1,
                           discountFactor: Double = 0.9,
-                          explorationRate: Double = 0.1): IO[QLearning[E]] = for {
-    qTable <- Ref.of[IO, Map[Any, Double]](Map.empty)
-  } yield new QLearning[E](env, qTable, learningRate, discountFactor, explorationRate)
+                          explorationRate: Double = 0.1,
+                          logger: BaseLogger[IO]
+                         ): IO[QLearning[E]] = for {
+    qTable <- Ref.of[IO, Map[(E#State, E#Action), Double]](Map.empty)
+  } yield new QLearning[E](env, qTable, learningRate, discountFactor, explorationRate, logger)
 }

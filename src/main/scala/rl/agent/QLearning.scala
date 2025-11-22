@@ -9,12 +9,12 @@ class QLearning[E <: Env[IO]](val env: E,
                               qTable: Ref[IO, Map[(E#State, E#Action), Double]],
                               learningRate: Double,
                               discountFactor: Double,
-                              explorationRate: Double,
+                              exploration: Exploration.Exploration,
+                              stateActionCount: Ref[IO, Map[(E#State, E#Action), Int]],
                               logger: BaseLogger[IO]
                              ) {
 
-  def act(state: env.State): IO[env.Action] = for {
-    actionSpace <- env.getActionSpace
+  def epsilonGreedyAction(actionSpace: List[env.Action], state: env.State, explorationRate: Double): IO[env.Action] = for {
     qValues <- qTable.get
     action <- if (Random.nextDouble() < explorationRate) {
       // Explore: choose a random action
@@ -23,6 +23,36 @@ class QLearning[E <: Env[IO]](val env: E,
       // Exploit: choose the best action based on Q-values
       val bestAction = actionSpace.maxBy(action => qValues.getOrElse((state, action), 0.0))
       IO.pure(bestAction)
+    }
+  } yield action
+
+  def ucbAction(actionSpace: List[env.Action], state: env.State, constant: Int): IO[env.Action] = for {
+    qValues <- qTable.get
+    counts <- stateActionCount.get
+    totalCounts = actionSpace.map(a => counts.getOrElse((state, a), 0)).sum
+    action <- IO.pure {
+      actionSpace.maxBy { a =>
+        val qValue = qValues.getOrElse((state, a), 0.0)
+        val actionCount = counts.getOrElse((state, a), 0)
+        if (actionCount == 0) Double.MaxValue
+        else qValue + constant * Math.sqrt(Math.log(totalCounts.toDouble) / actionCount.toDouble)
+      }
+    }
+    // Update the count for the selected action
+    _ <- stateActionCount.update { sc =>
+      val currentCount = sc.getOrElse((state, action), 0)
+      sc + ((state, action) -> (currentCount + 1))
+    }
+  } yield action
+
+
+  def act(state: env.State): IO[env.Action] = for {
+    actionSpace <- env.getActionSpace
+    action <- exploration match {
+      case Exploration.EpsilonGreedy(explorationRate) =>
+        epsilonGreedyAction(actionSpace, state, explorationRate)
+      case Exploration.UCB(constant) =>
+        ucbAction(actionSpace, state, constant)
     }
   } yield action
 
@@ -84,9 +114,10 @@ object QLearning {
   def apply[E <: Env[IO]](env: E,
                           learningRate: Double = 0.1,
                           discountFactor: Double = 0.9,
-                          explorationRate: Double = 0.1,
+                          exploration: Exploration.Exploration,
                           logger: BaseLogger[IO]
                          ): IO[QLearning[E]] = for {
     qTable <- Ref.of[IO, Map[(E#State, E#Action), Double]](Map.empty)
-  } yield new QLearning[E](env, qTable, learningRate, discountFactor, explorationRate, logger)
+    stateActionCount <- Ref.of[IO, Map[(E#State, E#Action), Int]](Map.empty)
+  } yield new QLearning[E](env, qTable, learningRate, discountFactor, exploration, stateActionCount, logger)
 }

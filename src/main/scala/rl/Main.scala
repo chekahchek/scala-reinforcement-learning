@@ -2,7 +2,7 @@ package rl
 
 import cats.effect.{IO, IOApp, ExitCode}
 import rl.env.GridWorld1D
-import rl.agent.QLearning
+import rl.agent.{QLearning, Exploration}
 import rl.logging.{DebugLogger, InfoLogger, NoOpLogger}
 
 object Main extends IOApp {
@@ -11,7 +11,8 @@ object Main extends IOApp {
     for {
       env <- GridWorld1D()
       logger = DebugLogger
-      agent <- QLearning(env, logger=logger)
+      explorationMethod = Exploration.UCB(10)
+      agent <- QLearning(env, exploration=explorationMethod, logger=logger)
       _ <- IO.println("Reinforcement Learning setup complete.")
       _ <- agent.learn(100)
       _ <- IO.println("Training complete.")

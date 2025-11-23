@@ -49,3 +49,13 @@ trait Exploration[E <: Env[F], F[_]] {
       }
     } yield action
   }
+
+object EpsilonGreedy {
+  def apply[E <: Env[IO]](explorationRate: Double): IO[EpsilonGreedy[E]] = IO.pure(new EpsilonGreedy[E](explorationRate))
+}
+
+object UCB {
+  def apply[E <: Env[IO]](constant: Int): IO[UCB[E]] = for {
+    ucbRef <- Ref[IO].of(Map.empty[(E#State, E#Action), Int])
+  } yield UCB[E](constant, ucbRef)
+}

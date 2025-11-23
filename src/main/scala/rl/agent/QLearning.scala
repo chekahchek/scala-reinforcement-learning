@@ -8,7 +8,7 @@ class QLearning[E <: Env[IO]](val env: E,
                               qTable: Ref[IO, Map[(E#State, E#Action), Double]],
                               learningRate: Double,
                               discountFactor: Double,
-                              explorationActor: Exploration[E, IO],
+                              explorationActor: IO[Exploration[E, IO]],
                               logger: BaseLogger[IO]
                              ) {
 
@@ -16,7 +16,7 @@ class QLearning[E <: Env[IO]](val env: E,
   def act(state: E#State): IO[E#Action] = for {
     actionSpace <- env.getActionSpace
     qValues <- qTable.get
-    action <- explorationActor.getAction(actionSpace, state, qValues)
+    action <- explorationActor.flatMap { a => a.getAction(actionSpace, state, qValues) }
   } yield action
 
   def runStep(state: E#State): IO[Boolean] = for {
@@ -77,17 +77,13 @@ object QLearning {
   def apply[E <: Env[IO]](env: E,
                           learningRate: Double = 0.1,
                           discountFactor: Double = 0.9,
-                          exploration: Exploration[E, IO],
+                          exploration: IO[Exploration[E, IO]],
                           logger: BaseLogger[IO]
                          ): IO[QLearning[E]] = for {
     qTable <- Ref.of[IO, Map[(E#State, E#Action), Double]](Map.empty)
-    explorationActor <- exploration match {
-      case UCB(constant, _) =>
-        for {
-          ref <- Ref.of[IO, Map[(E#State, E#Action), Int]](Map.empty)
-        } yield UCB[E](constant, ref)
-      case eg @ EpsilonGreedy(_) =>
-        IO.pure(eg)
+    explorationActor <- exploration.map {
+      case ucb@UCB(_, _) => IO.pure(ucb)
+      case eg@EpsilonGreedy(_) => IO.pure(eg)
     }
   } yield new QLearning[E](env, qTable, learningRate, discountFactor, explorationActor, logger)
 }

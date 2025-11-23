@@ -33,7 +33,7 @@ class QLearning[E <: Env[IO]](val env: E,
 
     // Update Q-values
     currentQ = qValues.getOrElse((state, action), 0.0)
-    maxNextQ = if (done) 0.0 else actionSpace.map(a => qValues.getOrElse((nextState, a), 0.0)).max
+    maxNextQ = if(done) 0.0 else actionSpace.map(a => qValues.getOrElse((nextState, a), 0.0)).max
     updatedQ = currentQ + learningRate * (reward + discountFactor * maxNextQ - currentQ)
     _ <- qTable.update(qv => qv + ((state, action) -> updatedQ))
   } yield done
@@ -41,7 +41,7 @@ class QLearning[E <: Env[IO]](val env: E,
   def runEpisode(): IO[Unit] = {
     def loop(state: E#State): IO[Unit] = for {
       done <- runStep(state)
-      _ <- if (done) IO.unit
+      _ <- if(done) IO.unit
       else for {
         nextState <- env.getState
         _ <- loop(nextState)
@@ -58,7 +58,7 @@ class QLearning[E <: Env[IO]](val env: E,
 
   def learn(numEpisodes: Int): IO[Unit] = {
     def loop(episode: Int): IO[Unit] = {
-      if (episode >= numEpisodes) IO.unit
+      if(episode >= numEpisodes) IO.unit
       else for {
         _ <- runEpisode()
         _ <- logger.debug(s"Completed episode: ${episode + 1}")

@@ -12,7 +12,6 @@ object DebugLogger extends BaseLogger[IO] {
   def error(message: String): IO[Unit] = IO.println(s"[ERROR] $message")
 }
 
-
 object NoOpLogger extends BaseLogger[IO] {
   def debug(message: String): IO[Unit] = IO.unit
 

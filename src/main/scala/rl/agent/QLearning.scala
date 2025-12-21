@@ -27,10 +27,6 @@ class QLearning[E <: Env[IO]](
     nextState = res._1
     reward = res._2
     done = res._3
-    nextStateStr <- env.renderState(nextState)
-    _ <- logger.debug(
-      s"Agent took action: $action resulting in state: $nextStateStr, reward: ${res._2}, done: ${res._3}"
-    )
 
     qValues <- qTable.get
     actionSpace <- env.getActionSpace
@@ -70,7 +66,7 @@ class QLearning[E <: Env[IO]](
       else
         for {
           _ <- runEpisode()
-          _ <- logger.debug(s"Completed episode: ${episode + 1}")
+          _ <- logger.info(s"Completed episode: ${episode + 1}")
           _ <- loop(episode + 1)
         } yield ()
     }

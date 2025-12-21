@@ -1,6 +1,7 @@
 package rl.env
 
 import cats.effect.{IO, Ref}
+import rl.logging.BaseLogger
 
 import scala.annotation.tailrec
 import scala.util.Random
@@ -34,7 +35,8 @@ class FrozenLake(
     val successRate: Double,
     val goal: (Int, Int),
     val hole1: (Int, Int),
-    val hole2: (Int, Int)
+    val hole2: (Int, Int),
+    logger: BaseLogger[IO]
 ) extends Env[IO] {
 
   override type Action = Int
@@ -42,6 +44,9 @@ class FrozenLake(
 
   def reset(): IO[FrozenLake] = for {
     _ <- stateRef.set(FrozenLake.initial)
+    _ <- logger.debug(
+      s"Environment reset. Goal at: $goal, Holes at: $hole1 and $hole2"
+    )
   } yield this
 
   def step(action: Action): IO[(State, Double, Boolean)] = for {
@@ -70,6 +75,9 @@ class FrozenLake(
     reward = if (newLocation == goal) 1.0 else 0.0
     done =
       (newLocation == goal) || (newLocation == hole1) || (newLocation == hole2)
+    _ <- logger.debug(
+      s"Agent took action: $action (with actual action $newAction) moved to location: $newLocation, reward: $reward, done: $done"
+    )
   } yield (newLocation, reward, done)
 
   def getActionSpace: IO[List[Action]] =
@@ -77,9 +85,6 @@ class FrozenLake(
 
   def getState: IO[State] = stateRef.get
 
-  def renderState(state: State): IO[String] = for {
-    location <- stateRef.get
-  } yield location.toString
 }
 
 object FrozenLake {
@@ -103,7 +108,8 @@ object FrozenLake {
 
   def apply(
       isSlippery: Boolean = true,
-      successRate: Double = 0.7
+      successRate: Double = 0.7,
+      logger: BaseLogger[IO]
   ): IO[FrozenLake] = for {
     initialLocation <- Ref[IO].of(initial)
 
@@ -120,6 +126,7 @@ object FrozenLake {
     successRate,
     goal,
     hole1,
-    hole2
+    hole2,
+    logger
   )
 }

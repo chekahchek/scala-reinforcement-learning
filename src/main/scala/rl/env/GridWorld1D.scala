@@ -1,6 +1,7 @@
 package rl.env
 
 import cats.effect.{IO, Ref}
+import rl.logging.BaseLogger
 
 /** Environment involves a 1D grid world with 5 locations
   * Action space = {-1, 1} corresponding to {left, right}
@@ -15,7 +16,8 @@ import cats.effect.{IO, Ref}
   * Rewards = +1.0 for reaching the target location, 0 otherwise
   */
 
-class GridWorld1D(val stateRef: Ref[IO, Int]) extends Env[IO] {
+class GridWorld1D(val stateRef: Ref[IO, Int], logger: BaseLogger[IO])
+    extends Env[IO] {
   override type Action = Int
   override type State = Int
 
@@ -30,6 +32,9 @@ class GridWorld1D(val stateRef: Ref[IO, Int]) extends Env[IO] {
     _ <- stateRef.set(newLocation)
     reward = if (newLocation == 4) 1.0 else 0.0
     done = newLocation == 4
+    _ <- logger.debug(
+      s"Agent took action: $action moved to location: $newLocation, reward: $reward, done: $done"
+    )
   } yield (newLocation, reward, done)
 
   def getActionSpace: IO[List[Action]] =
@@ -37,15 +42,12 @@ class GridWorld1D(val stateRef: Ref[IO, Int]) extends Env[IO] {
 
   def getState: IO[State] = stateRef.get
 
-  def renderState(state: State): IO[String] = for {
-    location <- stateRef.get
-  } yield location.toString
 }
 
 object GridWorld1D {
   private val initialLocation = 2
 
-  def apply(): IO[GridWorld1D] = for {
+  def apply(logger: BaseLogger[IO]): IO[GridWorld1D] = for {
     initialLocation <- Ref[IO].of(initialLocation)
-  } yield new GridWorld1D(initialLocation)
+  } yield new GridWorld1D(initialLocation, logger)
 }

@@ -1,23 +1,23 @@
 package rl
 
 import cats.effect.{ExitCode, IO, IOApp}
-import rl.env.{GridWorld1D, FrozenLake, BlackJack}
-import rl.agent.{EpsilonGreedy, UCB, QLearning, Sarsa}
-import rl.logging.{DebugLogger, InfoLogger, NoOpLogger}
+import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.implicits._
+import rl.api.Routes
 
 object Main extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] = {
-    val logger = DebugLogger
-    for {
-      env <- BlackJack(logger = logger)
-      explorationMethod = UCB[BlackJack](constant = 1)
-      //      explorationMethod = EpsilonGreedy[GridWorld1D](explorationRate = 0.1)
-      agent <- Sarsa(env, exploration = explorationMethod, logger = logger)
-      _ <- IO.println("Reinforcement Learning setup complete.")
-      _ <- agent.learn(100)
-      _ <- IO.println("Training complete.")
-    } yield ExitCode.Success
+    val routes = new Routes().routes
+
+    IO.println("Starting server on http://0.0.0.0:8080 ...") *>
+      BlazeServerBuilder[IO]
+        .bindHttp(8080, "0.0.0.0")
+        .withHttpApp(routes.orNotFound)
+        .serve
+        .compile
+        .drain
+        .as(ExitCode.Success)
   }
 
 }

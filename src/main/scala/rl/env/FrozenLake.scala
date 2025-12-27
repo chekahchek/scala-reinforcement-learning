@@ -107,8 +107,8 @@ object FrozenLake {
   }
 
   def apply(
-      isSlippery: Boolean = true,
-      successRate: Double = 0.7,
+      isSlippery: Boolean,
+      successRate: Double,
       logger: BaseLogger[IO]
   ): IO[FrozenLake] = for {
     initialLocation <- Ref[IO].of(initial)

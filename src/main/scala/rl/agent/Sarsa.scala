@@ -4,7 +4,7 @@ import cats.effect.{IO, Ref}
 import rl.env.Env
 import rl.logging.BaseLogger
 
-class QLearning[E <: Env[IO]](
+class Sarsa[E <: Env[IO]](
     env: E,
     qTable: Ref[IO, Map[(E#State, E#Action), Double]],
     learningRate: Double,
@@ -25,27 +25,26 @@ class QLearning[E <: Env[IO]](
       done: Boolean,
       qValues: Map[(E#State, E#Action), Double],
       actionSpace: List[E#Action]
-  ): IO[Double] = IO.pure {
-    if (done) 0.0
-    else actionSpace.map(a => qValues.getOrElse((nextState, a), 0.0)).max
-  }
+  ): IO[Double] = for {
+    nextAction <- act(nextState)
+  } yield qValues.getOrElse((nextState, nextAction), 0.0)
 
 }
 
-object QLearning {
+object Sarsa {
   def apply[E <: Env[IO]](
       env: E,
       learningRate: Double = 0.1,
       discountFactor: Double = 0.9,
       exploration: IO[Exploration[E, IO]],
       logger: BaseLogger[IO]
-  ): IO[QLearning[E]] = for {
+  ): IO[Sarsa[E]] = for {
     qTable <- Ref.of[IO, Map[(E#State, E#Action), Double]](Map.empty)
     explorationActor <- exploration.map {
       case ucb @ UCB(_, _)       => IO.pure(ucb)
       case eg @ EpsilonGreedy(_) => IO.pure(eg)
     }
-  } yield new QLearning[E](
+  } yield new Sarsa[E](
     env,
     qTable,
     learningRate,

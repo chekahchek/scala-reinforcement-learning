@@ -2,10 +2,6 @@ package rl.api
 
 import cats.effect.IO
 import cats.syntax.functor._
-import org.http4s.Response
-import org.http4s.dsl.Http4sDsl
-import org.http4s.circe._
-import io.circe.syntax._
 import rl.env.{Env, GridWorld1D, FrozenLake, BlackJack}
 import rl.agent.{
   EpsilonGreedy,
@@ -17,7 +13,7 @@ import rl.agent.{
 }
 import rl.logging.{BaseLogger, InfoLogger}
 
-object TrainService extends Http4sDsl[IO] {
+object ConfigParser {
 
   private val logger: BaseLogger[IO] = InfoLogger
 
@@ -53,26 +49,6 @@ object TrainService extends Http4sDsl[IO] {
         QLearning[Env[IO]](env, lr, df, IO.pure(exploration), logger)
       case AgentConfig.Sarsa(lr, df) =>
         Sarsa[Env[IO]](env, lr, df, IO.pure(exploration), logger)
-    }
-  }
-
-  def train(
-      agent: TemporalDifferenceLearning[Env[IO]],
-      episodes: Int
-  ): IO[Response[IO]] = {
-    (for {
-      _ <- logger.info(s"Starting training for $episodes episodes")
-      _ <- agent.learn(episodes)
-      _ <- logger.info("Training complete")
-    } yield Ok(
-      TrainResponse(
-        message = s"Training completed successfully for $episodes episodes",
-        status = "success"
-      ).asJson
-    )).flatten.handleErrorWith { err =>
-      InternalServerError(
-        ErrorResponse(s"Training failed: ${err.getMessage}").asJson
-      )
     }
   }
 }

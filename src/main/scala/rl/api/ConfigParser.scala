@@ -45,10 +45,10 @@ object ConfigParser {
       exploration: Exploration[Env[IO], IO]
   ): IO[TemporalDifferenceLearning[Env[IO]]] = {
     config match {
-      case AgentConfig.QLearning(lr, df) =>
-        QLearning[Env[IO]](env, lr, df, IO.pure(exploration), logger)
-      case AgentConfig.Sarsa(lr, df) =>
-        Sarsa[Env[IO]](env, lr, df, IO.pure(exploration), logger)
+      case AgentConfig.QLearning(lr, df, nSteps) =>
+        QLearning[Env[IO]](env, nSteps, lr, df, IO.pure(exploration), logger)
+      case AgentConfig.Sarsa(lr, df, nSteps) =>
+        Sarsa[Env[IO]](env, nSteps, lr, df, IO.pure(exploration), logger)
     }
   }
 }

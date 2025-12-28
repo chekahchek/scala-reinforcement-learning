@@ -1,12 +1,15 @@
 package rl.agent
 
 import cats.effect.{IO, Ref}
+import scala.collection.mutable.Queue
 import rl.env.Env
 import rl.logging.BaseLogger
 
 abstract class TemporalDifferenceLearning[E <: Env[IO]](
     val env: E,
     protected val qTable: Ref[IO, Map[(E#State, E#Action), Double]],
+    protected val buffer: Ref[IO, Queue[(E#State, E#Action, Double)]],
+    protected val nSteps: Int,
     protected val learningRate: Double,
     protected val discountFactor: Double,
     protected val explorationActor: IO[Exploration[E, IO]],
@@ -29,21 +32,72 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
       actionSpace: List[E#Action]
   ): IO[Double]
 
+  protected def updateQValue(done: Boolean, nStepsTaken: Int): IO[Unit] = {
+    if (done || nStepsTaken >= nSteps) {
+      for {
+        bufferQueue <- buffer.get
+        transitions = bufferQueue.dequeueAll(_ => true)
+        _ <-
+          if (transitions.isEmpty) IO.unit
+          else {
+            val (states, actions, rewards) = transitions.unzip3
+            // Calculate n-step return: sum of discounted rewards
+            val nStepReturn = rewards.zipWithIndex.foldLeft(0.0) {
+              case (acc, (reward, index)) =>
+                acc + reward * Math.pow(discountFactor, index)
+            }
+
+            // Get the first state-action pair
+            val firstState = states.head
+            val firstAction = actions.head
+
+            for {
+              qValues <- qTable.get
+              currentQ = qValues.getOrElse((firstState, firstAction), 0.0)
+
+              // Add bootstrap value if not done
+              bootstrapValue <-
+                if (done) IO.pure(0.0)
+                else {
+                  val lastState = states.last
+                  for {
+                    actionSpace <- env.getActionSpace
+                    nextQ <- getNextQValue(
+                      lastState,
+                      done,
+                      qValues,
+                      actionSpace
+                    )
+                  } yield Math.pow(discountFactor, rewards.length) * nextQ
+                }
+
+              // Update Q-value with n-step return
+              updatedQ =
+                currentQ + learningRate * (nStepReturn + bootstrapValue - currentQ)
+              _ <- qTable.update(qv =>
+                qv + ((firstState, firstAction) -> updatedQ)
+              )
+
+              // Clear the buffer after update
+              _ <- buffer.set(Queue.empty)
+            } yield ()
+          }
+      } yield ()
+    } else IO.unit
+  }
+
   protected def runStep(state: E#State, action: E#Action): IO[Boolean] = for {
     res <- env.step(action.asInstanceOf[env.Action])
     nextState = res._1
     reward = res._2
     done = res._3
 
-    qValues <- qTable.get
-    actionSpace <- env.getActionSpace
+    // Add transition to buffer
+    _ <- buffer.update(_.enqueue((state, action, reward)))
+    bufferSize <- buffer.get.map(_.size)
 
-    // Update Q-values
-    currentQ = qValues.getOrElse((state, action), 0.0)
-    nextQ <- getNextQValue(nextState, done, qValues, actionSpace)
-    updatedQ =
-      currentQ + learningRate * (reward + discountFactor * nextQ - currentQ)
-    _ <- qTable.update(qv => qv + ((state, action) -> updatedQ))
+    // Update Q-values when we have n steps or episode is done
+    _ <- updateQValue(done, bufferSize)
   } yield done
 
   def runEpisode(): IO[Unit] = {

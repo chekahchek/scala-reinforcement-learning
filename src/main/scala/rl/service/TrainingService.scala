@@ -1,7 +1,7 @@
 package rl.service
 
 import cats.effect.IO
-import rl.agent.TemporalDifferenceLearning
+import rl.agent.Agent
 import rl.env.Env
 import rl.logging.{BaseLogger, InfoLogger}
 
@@ -28,7 +28,7 @@ object TrainingService {
   private val logger: BaseLogger[IO] = InfoLogger
 
   def train(
-      agent: TemporalDifferenceLearning[Env[IO]],
+      agent: Agent[Env[IO], IO],
       episodes: Int
   ): IO[TrainResult] = {
     (for {

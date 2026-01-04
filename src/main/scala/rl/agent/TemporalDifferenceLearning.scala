@@ -14,7 +14,7 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     protected val discountFactor: Double,
     protected val explorationActor: IO[Exploration[E, IO]],
     protected val logger: BaseLogger[IO]
-) {
+) extends Agent[E, IO] {
 
   def act(state: E#State): IO[E#Action] = for {
     actionSpace <- env.getActionSpace
@@ -32,7 +32,11 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
       actionSpace: List[E#Action]
   ): IO[Double]
 
-  protected def updateQValue(done: Boolean, nStepsTaken: Int): IO[Unit] = {
+  protected def updateQValue(
+      done: Boolean,
+      nStepsTaken: Int,
+      nextState: E#State
+  ): IO[Unit] = {
     if (done || nStepsTaken >= nSteps) {
       for {
         bufferQueue <- buffer.get
@@ -56,14 +60,14 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
               currentQ = qValues.getOrElse((firstState, firstAction), 0.0)
 
               // Add bootstrap value if not done
+              // Use the passed nextState (state after last action) for bootstrapping
               bootstrapValue <-
                 if (done) IO.pure(0.0)
                 else {
-                  val lastState = states.last
                   for {
                     actionSpace <- env.getActionSpace
                     nextQ <- getNextQValue(
-                      lastState,
+                      nextState,
                       done,
                       qValues,
                       actionSpace
@@ -86,9 +90,12 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     } else IO.unit
   }
 
-  protected def runStep(state: E#State, action: E#Action): IO[Boolean] = for {
+  protected def runStep(
+      state: E#State,
+      action: E#Action
+  ): IO[(Boolean, E#State)] = for {
     res <- env.step(action.asInstanceOf[env.Action])
-    nextState = res._1
+    nextState = res._1.asInstanceOf[E#State]
     reward = res._2
     done = res._3
 
@@ -97,20 +104,17 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     bufferSize <- buffer.get.map(_.size)
 
     // Update Q-values when we have n steps or episode is done
-    _ <- updateQValue(done, bufferSize)
-  } yield done
+    _ <- updateQValue(done, bufferSize, nextState)
+  } yield (done, nextState)
 
   def runEpisode(): IO[Unit] = {
     def loop(state: E#State): IO[Unit] = for {
       action <- act(state)
-      done <- runStep(state, action)
+      result <- runStep(state, action)
+      (done, nextState) = result
       _ <-
         if (done) IO.unit
-        else
-          for {
-            nextState <- env.getState
-            _ <- loop(nextState)
-          } yield ()
+        else loop(nextState)
     } yield ()
 
     for {

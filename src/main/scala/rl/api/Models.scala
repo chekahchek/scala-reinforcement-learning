@@ -54,6 +54,11 @@ object AgentConfig {
       discountFactor: Double = 0.9,
       nSteps: Int = 1
   ) extends AgentConfig
+  case class DoubleQLearning(
+      learningRate: Double = 0.1,
+      discountFactor: Double = 0.9,
+      nSteps: Int = 1
+  ) extends AgentConfig
 
   implicit val decoder: Decoder[AgentConfig] = Decoder.instance { cursor =>
     cursor.downField("type").as[String].flatMap {
@@ -69,6 +74,12 @@ object AgentConfig {
           df <- cursor.downField("discountFactor").as[Option[Double]].map(_.getOrElse(0.9))
           nSteps <- cursor.downField("nSteps").as[Option[Int]].map(_.getOrElse(1))
         } yield Sarsa(lr, df, nSteps)
+      case "DoubleQLearning" =>
+        for {
+          lr <- cursor.downField("learningRate").as[Option[Double]].map(_.getOrElse(0.1))
+          df <- cursor.downField("discountFactor").as[Option[Double]].map(_.getOrElse(0.9))
+          nSteps <- cursor.downField("nSteps").as[Option[Int]].map(_.getOrElse(1))
+        } yield DoubleQLearning(lr, df, nSteps)
       case other => Left(io.circe.DecodingFailure(s"Unknown agent type: $other", cursor.history))
     }
   }
@@ -84,6 +95,13 @@ object AgentConfig {
     case Sarsa(lr, df, nSteps) =>
       io.circe.Json.obj(
         "type" -> io.circe.Json.fromString("Sarsa"),
+        "learningRate" -> io.circe.Json.fromDouble(lr).getOrElse(io.circe.Json.fromDoubleOrNull(lr)),
+        "discountFactor" -> io.circe.Json.fromDouble(df).getOrElse(io.circe.Json.fromDoubleOrNull(df)),
+        "nSteps" -> io.circe.Json.fromInt(nSteps)
+      )
+    case DoubleQLearning(lr, df, nSteps) =>
+      io.circe.Json.obj(
+        "type" -> io.circe.Json.fromString("DoubleQLearning"),
         "learningRate" -> io.circe.Json.fromDouble(lr).getOrElse(io.circe.Json.fromDoubleOrNull(lr)),
         "discountFactor" -> io.circe.Json.fromDouble(df).getOrElse(io.circe.Json.fromDoubleOrNull(df)),
         "nSteps" -> io.circe.Json.fromInt(nSteps)

@@ -8,8 +8,9 @@ import rl.agent.{
   UCB,
   QLearning,
   Sarsa,
-  TemporalDifferenceLearning,
-  Exploration
+  Agent,
+  Exploration,
+  DoubleQLearning
 }
 import rl.logging.{BaseLogger, InfoLogger}
 
@@ -43,12 +44,21 @@ object ConfigParser {
       config: AgentConfig,
       env: Env[IO],
       exploration: Exploration[Env[IO], IO]
-  ): IO[TemporalDifferenceLearning[Env[IO]]] = {
+  ): IO[Agent[Env[IO], IO]] = {
     config match {
       case AgentConfig.QLearning(lr, df, nSteps) =>
         QLearning[Env[IO]](env, nSteps, lr, df, IO.pure(exploration), logger)
       case AgentConfig.Sarsa(lr, df, nSteps) =>
         Sarsa[Env[IO]](env, nSteps, lr, df, IO.pure(exploration), logger)
+      case AgentConfig.DoubleQLearning(lr, df, nSteps) =>
+        DoubleQLearning[Env[IO]](
+          env,
+          nSteps,
+          lr,
+          df,
+          IO.pure(exploration),
+          logger
+        )
     }
   }
 }

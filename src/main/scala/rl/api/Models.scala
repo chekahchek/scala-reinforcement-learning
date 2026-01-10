@@ -2,6 +2,7 @@ package rl.api
 
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto._
+import rl.metrics.{EpisodeMetrics, TrainingMetrics}
 
 // Request models
 case class TrainRequest(
@@ -141,9 +142,36 @@ object ExplorationConfig {
 }
 
 // Response models
+case class EpisodeMetricsResponse(
+    episodeNumber: Int,
+    totalReward: Double,
+    totalSteps: Int
+)
+
+object EpisodeMetricsResponse {
+  implicit val encoder: Encoder[EpisodeMetricsResponse] = deriveEncoder[EpisodeMetricsResponse]
+  implicit val decoder: Decoder[EpisodeMetricsResponse] = deriveDecoder[EpisodeMetricsResponse]
+  
+  def fromEpisodeMetrics(em: EpisodeMetrics): EpisodeMetricsResponse =
+    EpisodeMetricsResponse(em.episodeNumber, em.totalReward, em.totalSteps)
+}
+
+case class TrainingMetricsResponse(
+    episodeMetrics: List[EpisodeMetricsResponse]
+)
+
+object TrainingMetricsResponse {
+  implicit val encoder: Encoder[TrainingMetricsResponse] = deriveEncoder[TrainingMetricsResponse]
+  implicit val decoder: Decoder[TrainingMetricsResponse] = deriveDecoder[TrainingMetricsResponse]
+  
+  def fromTrainingMetrics(tm: TrainingMetrics): TrainingMetricsResponse =
+    TrainingMetricsResponse(tm.episodeMetrics.map(EpisodeMetricsResponse.fromEpisodeMetrics))
+}
+
 case class TrainResponse(
-    message: String,
-    status: String
+    status: String,
+    error: Option[String],
+    metrics: Option[TrainingMetricsResponse]
 )
 
 object TrainResponse {

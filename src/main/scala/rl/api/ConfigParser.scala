@@ -12,7 +12,7 @@ import rl.agent.{
   Exploration,
   DoubleQLearning
 }
-import rl.logging.{BaseLogger, InfoLogger}
+import rl.logging.{BaseLogger, InfoLogger, DebugLogger}
 
 object ConfigParser {
 

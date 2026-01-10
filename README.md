@@ -24,6 +24,16 @@ Train a reinforcement learning agent by sending a POST request to `/train` with 
 
 Full list of configurations for each setting is specified in the subsequent sections.
 
+The response contains:
+- **status**: "success" if training completed successfully
+- **error**: null on success, contains error message on failure
+- **metrics**:
+  - **episodeMetrics**: List of metrics for each episode
+    - **episodeNumber**: Episode number
+    - **totalReward**: Total reward accumulated in the episode
+    - **totalSteps**: Number of steps taken in the episode
+
+
 ### Example Request
 
 ```bash
@@ -31,7 +41,7 @@ curl -X POST http://localhost:8080/train \
   -H "Content-Type: application/json" \
   -d '{
     "environment": {
-      "type": "BlackJack"
+      "type": "GridWorld1D"
     },
     "agent": {
       "type": "Sarsa",
@@ -39,13 +49,47 @@ curl -X POST http://localhost:8080/train \
       "discountFactor": 0.9
     },
     "exploration": {
-      "type": "UCB",
-      "constant": 1
+      "type": "EpsilonGreedy",
+      "explorationRate": 0.1
     },
     "episodes": 100
   }'
 ```
 
+### Example Response
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "error": null,
+  "metrics": {
+    "episodeMetrics": [
+      {
+        "episodeNumber": 1,
+        "totalReward": 5.0,
+        "totalSteps": 10
+      },
+      {
+        "episodeNumber": 2,
+        "totalReward": 8.0,
+        "totalSteps": 8
+      }
+    ]
+  }
+}
+```
+
+#### Error Response
+
+```json
+{
+  "status": "error",
+  "error": "Error message describing what went wrong",
+  "metrics": null
+}
+```
 
 ## Environments
 

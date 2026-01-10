@@ -4,23 +4,24 @@ import cats.effect.IO
 import rl.agent.Agent
 import rl.env.Env
 import rl.logging.{BaseLogger, InfoLogger}
+import rl.metrics.TrainingMetrics
 
 case class TrainResult(
-    episodes: Int,
     status: String,
-    message: String
+    error: Option[String],
+    metrics: Option[TrainingMetrics]
 )
 
 object TrainResult {
-  def success(episodes: Int): TrainResult =
+  def success(metrics: TrainingMetrics): TrainResult =
     TrainResult(
-      episodes,
       "success",
-      s"Training completed successfully for $episodes episodes"
+      None,
+      Some(metrics)
     )
 
-  def failure(episodes: Int, error: String): TrainResult =
-    TrainResult(episodes, "failed", s"Training failed: $error")
+  def failure(error: String): TrainResult =
+    TrainResult("failed", Some(error), None)
 }
 
 object TrainingService {
@@ -33,9 +34,9 @@ object TrainingService {
   ): IO[TrainResult] = {
     (for {
       _ <- logger.info(s"Starting training for $episodes episodes")
-      _ <- agent.learn(episodes)
+      metrics <- agent.learn(episodes)
       _ <- logger.info("Training complete")
-    } yield TrainResult.success(episodes))
-      .handleError(err => TrainResult.failure(episodes, err.getMessage))
+    } yield TrainResult.success(metrics))
+      .handleErrorWith(err => IO.pure(TrainResult.failure(err.getMessage)))
   }
 }

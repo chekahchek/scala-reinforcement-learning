@@ -23,8 +23,11 @@ class Routes extends Http4sDsl[IO] {
         agent <- ConfigParser.parseAgent(trainReq.agent, environment, exploration)
         result <- TrainingService.train(agent, trainReq.episodes)
         response <- result.status match {
-          case "success" => Ok(TrainResponse(result.message, result.status).asJson)
-          case _ => InternalServerError(ErrorResponse(result.message).asJson)
+          case "success" => 
+            val metricsResponse = result.metrics.map(TrainingMetricsResponse.fromTrainingMetrics)
+            Ok(TrainResponse(result.status, result.error, metricsResponse).asJson)
+          case _ => 
+            InternalServerError(TrainResponse(result.status, result.error, None).asJson)
         }
       } yield response).handleErrorWith { err =>
         InternalServerError(ErrorResponse(err.getMessage).asJson)

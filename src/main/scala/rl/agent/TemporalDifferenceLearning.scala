@@ -4,6 +4,7 @@ import cats.effect.{IO, Ref}
 import scala.collection.mutable.Queue
 import rl.env.Env
 import rl.logging.BaseLogger
+import rl.metrics.{EpisodeMetrics, TrainingMetrics}
 
 abstract class TemporalDifferenceLearning[E <: Env[IO]](
     val env: E,
@@ -107,39 +108,60 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     _ <- updateQValue(done, bufferSize, nextState)
   } yield (done, nextState, reward)
 
-  def runEpisode(): IO[Double] = {
-    def loop(state: E#State, reward: Double): IO[Double] = for {
-      action <- act(state)
-      result <- runStep(state, action)
-      (done, nextState, rewardObtained) = result
-      totalEpisodeReward = reward + rewardObtained
-      _ <-
-        if (done) IO.pure(totalEpisodeReward)
-        else loop(nextState, totalEpisodeReward)
-    } yield totalEpisodeReward
+  def runEpisode(): IO[(Double, Int)] = {
+    def loop(
+        state: E#State,
+        reward: Double,
+        stepCount: Int
+    ): IO[(Double, Int)] =
+      for {
+        action <- act(state)
+        result <- runStep(state, action)
+        (done, nextState, rewardObtained) = result
+        totalEpisodeReward = reward + rewardObtained
+        totalStepCount = stepCount + 1
+        result <-
+          if (done) IO.pure((totalEpisodeReward, totalStepCount))
+          else loop(nextState, totalEpisodeReward, totalStepCount)
+      } yield result
 
     for {
       _ <- env.reset()
       initialState <- env.getState
       initialReward = 0.0
-      totalEpisodeReward <- loop(initialState, initialReward)
-    } yield totalEpisodeReward
+      initialStepCount = 0
+      episodeResult <- loop(
+        initialState,
+        initialReward,
+        initialStepCount
+      )
+    } yield episodeResult
   }
 
-  def learn(episodes: Int): IO[Unit] = {
-    def loop(episode: Int): IO[Unit] = {
-      if (episode >= episodes) IO.unit
+  def learn(episodes: Int): IO[TrainingMetrics] = {
+    def loop(
+        episode: Int,
+        metrics: List[EpisodeMetrics]
+    ): IO[List[EpisodeMetrics]] = {
+      if (episode >= episodes) IO.pure(metrics)
       else
         for {
-          totalEpisodeReward <- runEpisode()
-          _ <- logger.info(
-            s"Completed episode: ${episode + 1}, Total Reward: $totalEpisodeReward"
+          episodeResult <- runEpisode()
+          totalEpisodeReward = episodeResult._1
+          totalStepCount = episodeResult._2
+          episodeMetric = EpisodeMetrics(
+            episode + 1,
+            totalEpisodeReward,
+            totalStepCount
           )
-          _ <- loop(episode + 1)
-        } yield ()
+          _ <- logger.info(
+            s"Completed episode: ${episode + 1}, Total Reward: $totalEpisodeReward, Total Steps: $totalStepCount  "
+          )
+          updatedMetrics <- loop(episode + 1, metrics :+ episodeMetric)
+        } yield updatedMetrics
     }
 
-    loop(0)
+    loop(0, List.empty).map(metrics => TrainingMetrics(metrics))
   }
 
 }

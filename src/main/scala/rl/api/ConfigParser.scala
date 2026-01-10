@@ -16,7 +16,7 @@ import rl.logging.{BaseLogger, InfoLogger, DebugLogger}
 
 object ConfigParser {
 
-  private val logger: BaseLogger[IO] = DebugLogger
+  private val logger: BaseLogger[IO] = InfoLogger
 
   def parseEnvironment(config: EnvironmentConfig): IO[Env[IO]] = {
     config match {

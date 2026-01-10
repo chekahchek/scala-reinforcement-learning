@@ -93,7 +93,7 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
   protected def runStep(
       state: E#State,
       action: E#Action
-  ): IO[(Boolean, E#State)] = for {
+  ): IO[(Boolean, E#State, Double)] = for {
     res <- env.step(action.asInstanceOf[env.Action])
     nextState = res._1.asInstanceOf[E#State]
     reward = res._2
@@ -105,23 +105,25 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
 
     // Update Q-values when we have n steps or episode is done
     _ <- updateQValue(done, bufferSize, nextState)
-  } yield (done, nextState)
+  } yield (done, nextState, reward)
 
-  def runEpisode(): IO[Unit] = {
-    def loop(state: E#State): IO[Unit] = for {
+  def runEpisode(): IO[Double] = {
+    def loop(state: E#State, reward: Double): IO[Double] = for {
       action <- act(state)
       result <- runStep(state, action)
-      (done, nextState) = result
+      (done, nextState, rewardObtained) = result
+      totalEpisodeReward = reward + rewardObtained
       _ <-
-        if (done) IO.unit
-        else loop(nextState)
-    } yield ()
+        if (done) IO.pure(totalEpisodeReward)
+        else loop(nextState, totalEpisodeReward)
+    } yield totalEpisodeReward
 
     for {
       _ <- env.reset()
       initialState <- env.getState
-      _ <- loop(initialState)
-    } yield ()
+      initialReward = 0.0
+      totalEpisodeReward <- loop(initialState, initialReward)
+    } yield totalEpisodeReward
   }
 
   def learn(episodes: Int): IO[Unit] = {
@@ -129,8 +131,10 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
       if (episode >= episodes) IO.unit
       else
         for {
-          _ <- runEpisode()
-          _ <- logger.info(s"Completed episode: ${episode + 1}")
+          totalEpisodeReward <- runEpisode()
+          _ <- logger.info(
+            s"Completed episode: ${episode + 1}, Total Reward: $totalEpisodeReward"
+          )
           _ <- loop(episode + 1)
         } yield ()
     }

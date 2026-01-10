@@ -12,11 +12,11 @@ import rl.agent.{
   Exploration,
   DoubleQLearning
 }
-import rl.logging.{BaseLogger, InfoLogger}
+import rl.logging.{BaseLogger, InfoLogger, DebugLogger}
 
 object ConfigParser {
 
-  private val logger: BaseLogger[IO] = InfoLogger
+  private val logger: BaseLogger[IO] = DebugLogger
 
   def parseEnvironment(config: EnvironmentConfig): IO[Env[IO]] = {
     config match {

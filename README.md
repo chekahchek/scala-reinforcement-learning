@@ -31,7 +31,7 @@ curl -X POST http://localhost:8080/train \
   -H "Content-Type: application/json" \
   -d '{
     "environment": {
-      "type": "BlackJack"
+      "type": "GridWorld1D"
     },
     "agent": {
       "type": "Sarsa",

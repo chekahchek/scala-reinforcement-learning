@@ -25,6 +25,15 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     }
   } yield action
 
+  /** Peek at what action would be selected without updating exploration state (e.g., UCB counts) */
+  def peekAct(state: E#State): IO[E#Action] = for {
+    actionSpace <- env.getActionSpace
+    qValues <- qTable.get
+    action <- explorationActor.flatMap { a =>
+      a.peekAction(actionSpace, state, qValues)
+    }
+  } yield action
+
 // To be overridden by the subclass
   protected def getNextQValue(
       nextState: E#State,

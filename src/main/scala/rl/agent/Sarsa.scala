@@ -31,7 +31,8 @@ class Sarsa[E <: Env[IO]](
       qValues: Map[(E#State, E#Action), Double],
       actionSpace: List[E#Action]
   ): IO[Double] = for {
-    nextAction <- act(nextState)
+    // Use peekAct to avoid updating UCB counts for hypothetical action selection
+    nextAction <- peekAct(nextState)
   } yield qValues.getOrElse((nextState, nextAction), 0.0)
 
 }

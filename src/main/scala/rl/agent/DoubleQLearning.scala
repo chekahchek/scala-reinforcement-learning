@@ -5,10 +5,9 @@ import cats.effect.std.Random
 import scala.collection.mutable.Queue
 import rl.env.Env
 import rl.logging.BaseLogger
-import rl.metrics.{EpisodeMetrics, TrainingMetrics}
 
 class DoubleQLearning[E <: Env[IO]](
-    env: E,
+    val env: E,
     qTable1: Ref[IO, Map[(E#State, E#Action), Double]],
     qTable2: Ref[IO, Map[(E#State, E#Action), Double]],
     buffer: Ref[IO, Queue[(E#State, E#Action, Double)]],
@@ -16,11 +15,13 @@ class DoubleQLearning[E <: Env[IO]](
     learningRate: Double,
     discountFactor: Double,
     explorationActor: IO[Exploration[E, IO]],
-    logger: BaseLogger[IO],
+    protected val logger: BaseLogger[IO],
     random: Random[IO]
-) extends Agent[E, IO] {
+) extends Agent[E] {
 
-  def act(
+  def act(state: E#State): IO[E#Action] = act(state, qTable1)
+
+  private def act(
       state: E#State,
       selectActionTable: Ref[IO, Map[(E#State, E#Action), Double]]
   ): IO[E#Action] = for {
@@ -64,9 +65,8 @@ class DoubleQLearning[E <: Env[IO]](
           else {
             val (states, actions, rewards) = transitions.unzip3
             // Calculate n-step return: sum of discounted rewards
-            val nStepReturn = rewards.zipWithIndex.foldLeft(0.0) {
-              case (acc, (reward, index)) =>
-                acc + reward * Math.pow(discountFactor, index)
+            val nStepReturn = rewards.zipWithIndex.foldLeft(0.0) { case (acc, (reward, index)) =>
+              acc + reward * Math.pow(discountFactor, index)
             }
 
             // Get the first state-action pair
@@ -100,9 +100,7 @@ class DoubleQLearning[E <: Env[IO]](
               // Update Q-value with n-step return based on the table where action was selected
               updatedQ =
                 currentQ + learningRate * (nStepReturn + bootstrapValue - currentQ)
-              _ <- selectActionTable.update(qv =>
-                qv + ((firstState, firstAction) -> updatedQ)
-              )
+              _ <- selectActionTable.update(qv => qv + ((firstState, firstAction) -> updatedQ))
 
               // Clear the buffer after update
               _ <- buffer.set(Queue.empty)
@@ -113,6 +111,11 @@ class DoubleQLearning[E <: Env[IO]](
   }
 
   protected def runStep(
+      state: E#State,
+      action: E#Action
+  ): IO[(Boolean, E#State, Double)] = runStep(state, action, qTable1, qTable2)
+
+  private def runStep(
       state: E#State,
       action: E#Action,
       selectActionTable: Ref[IO, Map[(E#State, E#Action), Double]],
@@ -137,7 +140,7 @@ class DoubleQLearning[E <: Env[IO]](
     )
   } yield (done, nextState, reward)
 
-  def runEpisode(): IO[(Double, Int)] = {
+  override def runEpisode(): IO[(Double, Int)] = {
     def loop(
         state: E#State,
         reward: Double,
@@ -163,32 +166,6 @@ class DoubleQLearning[E <: Env[IO]](
       initialStepCount = 0
       episodeResult <- loop(initialState, initialReward, initialStepCount)
     } yield episodeResult
-  }
-
-  def learn(episodes: Int): IO[TrainingMetrics] = {
-    def loop(
-        episode: Int,
-        metrics: List[EpisodeMetrics]
-    ): IO[List[EpisodeMetrics]] = {
-      if (episode >= episodes) IO.pure(metrics)
-      else
-        for {
-          episodeResult <- runEpisode()
-          totalEpisodeReward = episodeResult._1
-          totalStepCount = episodeResult._2
-          episodeMetric = EpisodeMetrics(
-            episode + 1,
-            totalEpisodeReward,
-            totalStepCount
-          )
-          _ <- logger.info(
-            s"Completed episode: ${episode + 1}, Total Reward: $totalEpisodeReward, Total Steps: $totalStepCount"
-          )
-          updatedMetrics <- loop(episode + 1, metrics :+ episodeMetric)
-        } yield updatedMetrics
-    }
-
-    loop(0, List.empty).map(metrics => TrainingMetrics(metrics))
   }
 }
 

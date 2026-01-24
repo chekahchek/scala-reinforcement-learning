@@ -29,7 +29,7 @@ object TrainingService {
   private val logger: BaseLogger[IO] = InfoLogger
 
   def train(
-      agent: Agent[Env[IO], IO],
+      agent: Agent[Env[IO]],
       episodes: Int
   ): IO[TrainResult] = {
     (for {

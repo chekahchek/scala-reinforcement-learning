@@ -153,6 +153,28 @@ If `isSlippery` is True, then agent might not move in the same direction as what
 }
 ```
 
+### Dyna-Q
+```json
+{
+  "type": "DynaQ",
+  "learningRate": 0.1,
+  "discountFactor": 0.9,
+  "planningSteps" : 3
+}
+```
+
+### Dyna-Q+
+```json
+{
+  "type": "DynaQPlus",
+  "learningRate": 0.1,
+  "discountFactor": 0.9,
+  "planningSteps" : 3
+  "kappa" : 0.001,
+}
+```
+
+
 ## Exploration Methods
 
 ### Epsilon-Greedy

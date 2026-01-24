@@ -10,7 +10,9 @@ import rl.agent.{
   Sarsa,
   Agent,
   Exploration,
-  DoubleQLearning
+  DoubleQLearning,
+  DynaQ,
+  DynaQPlus
 }
 import rl.logging.{BaseLogger, InfoLogger, DebugLogger}
 
@@ -44,7 +46,7 @@ object ConfigParser {
       config: AgentConfig,
       env: Env[IO],
       exploration: Exploration[Env[IO], IO]
-  ): IO[Agent[Env[IO], IO]] = {
+  ): IO[Agent[Env[IO]]] = {
     config match {
       case AgentConfig.QLearning(lr, df, nSteps) =>
         QLearning[Env[IO]](env, nSteps, lr, df, IO.pure(exploration), logger)
@@ -59,6 +61,10 @@ object ConfigParser {
           IO.pure(exploration),
           logger
         )
+      case AgentConfig.DynaQ(lr, df, planningSteps) =>
+        DynaQ[Env[IO]](env, lr, df, planningSteps, IO.pure(exploration), logger)
+      case AgentConfig.DynaQPlus(lr, df, planningSteps, kappa) =>
+        DynaQPlus[Env[IO]](env, lr, df, planningSteps, IO.pure(exploration), logger, kappa)
     }
   }
 }

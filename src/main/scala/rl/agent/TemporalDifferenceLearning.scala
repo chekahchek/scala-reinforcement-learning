@@ -4,7 +4,6 @@ import cats.effect.{IO, Ref}
 import scala.collection.mutable.Queue
 import rl.env.Env
 import rl.logging.BaseLogger
-import rl.metrics.{EpisodeMetrics, TrainingMetrics}
 
 abstract class TemporalDifferenceLearning[E <: Env[IO]](
     val env: E,
@@ -15,7 +14,7 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     protected val discountFactor: Double,
     protected val explorationActor: IO[Exploration[E, IO]],
     protected val logger: BaseLogger[IO]
-) extends Agent[E, IO] {
+) extends Agent[E] {
 
   def act(state: E#State): IO[E#Action] = for {
     actionSpace <- env.getActionSpace
@@ -56,9 +55,8 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
           else {
             val (states, actions, rewards) = transitions.unzip3
             // Calculate n-step return: sum of discounted rewards
-            val nStepReturn = rewards.zipWithIndex.foldLeft(0.0) {
-              case (acc, (reward, index)) =>
-                acc + reward * Math.pow(discountFactor, index)
+            val nStepReturn = rewards.zipWithIndex.foldLeft(0.0) { case (acc, (reward, index)) =>
+              acc + reward * Math.pow(discountFactor, index)
             }
 
             // Get the first state-action pair
@@ -88,9 +86,7 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
               // Update Q-value with n-step return
               updatedQ =
                 currentQ + learningRate * (nStepReturn + bootstrapValue - currentQ)
-              _ <- qTable.update(qv =>
-                qv + ((firstState, firstAction) -> updatedQ)
-              )
+              _ <- qTable.update(qv => qv + ((firstState, firstAction) -> updatedQ))
 
               // Clear the buffer after update
               _ <- buffer.set(Queue.empty)
@@ -116,61 +112,4 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     // Update Q-values when we have n steps or episode is done
     _ <- updateQValue(done, bufferSize, nextState)
   } yield (done, nextState, reward)
-
-  def runEpisode(): IO[(Double, Int)] = {
-    def loop(
-        state: E#State,
-        reward: Double,
-        stepCount: Int
-    ): IO[(Double, Int)] =
-      for {
-        action <- act(state)
-        result <- runStep(state, action)
-        (done, nextState, rewardObtained) = result
-        totalEpisodeReward = reward + rewardObtained
-        totalStepCount = stepCount + 1
-        result <-
-          if (done) IO.pure((totalEpisodeReward, totalStepCount))
-          else loop(nextState, totalEpisodeReward, totalStepCount)
-      } yield result
-
-    for {
-      _ <- env.reset()
-      initialState <- env.getState
-      initialReward = 0.0
-      initialStepCount = 0
-      episodeResult <- loop(
-        initialState,
-        initialReward,
-        initialStepCount
-      )
-    } yield episodeResult
-  }
-
-  def learn(episodes: Int): IO[TrainingMetrics] = {
-    def loop(
-        episode: Int,
-        metrics: List[EpisodeMetrics]
-    ): IO[List[EpisodeMetrics]] = {
-      if (episode >= episodes) IO.pure(metrics)
-      else
-        for {
-          episodeResult <- runEpisode()
-          totalEpisodeReward = episodeResult._1
-          totalStepCount = episodeResult._2
-          episodeMetric = EpisodeMetrics(
-            episode + 1,
-            totalEpisodeReward,
-            totalStepCount
-          )
-          _ <- logger.info(
-            s"Completed episode: ${episode + 1}, Total Reward: $totalEpisodeReward, Total Steps: $totalStepCount  "
-          )
-          updatedMetrics <- loop(episode + 1, metrics :+ episodeMetric)
-        } yield updatedMetrics
-    }
-
-    loop(0, List.empty).map(metrics => TrainingMetrics(metrics))
-  }
-
 }

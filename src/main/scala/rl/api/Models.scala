@@ -60,7 +60,17 @@ object AgentConfig {
       discountFactor: Double = 0.9,
       nSteps: Int = 1
   ) extends AgentConfig
-
+  case class DynaQ(
+      learningRate: Double = 0.1,
+      discountFactor: Double = 0.9,
+      planningSteps: Int = 5
+  ) extends AgentConfig
+  case class DynaQPlus(
+      learningRate: Double = 0.1,
+      discountFactor: Double = 0.9,
+      planningSteps: Int = 5,
+      kappa: Double = 0.001
+  ) extends AgentConfig
   implicit val decoder: Decoder[AgentConfig] = Decoder.instance { cursor =>
     cursor.downField("type").as[String].flatMap {
       case "QLearning" =>
@@ -81,6 +91,21 @@ object AgentConfig {
           df <- cursor.downField("discountFactor").as[Option[Double]].map(_.getOrElse(0.9))
           nSteps <- cursor.downField("nSteps").as[Option[Int]].map(_.getOrElse(1))
         } yield DoubleQLearning(lr, df, nSteps)
+      case "DynaQ" =>
+        for {
+          lr <- cursor.downField("learningRate").as[Option[Double]].map(_.getOrElse(0.1))
+          df <- cursor.downField("discountFactor").as[Option[Double]].map(_.getOrElse(0.9))
+          nSteps <- cursor.downField("nSteps").as[Option[Int]].map(_.getOrElse(1))
+          planningSteps <- cursor.downField("planningSteps").as[Option[Int]].map(_.getOrElse(5))
+        } yield DynaQ(lr, df, planningSteps)
+      case "DynaQPlus" =>
+        for {
+          lr <- cursor.downField("learningRate").as[Option[Double]].map(_.getOrElse(0.1))
+          df <- cursor.downField("discountFactor").as[Option[Double]].map(_.getOrElse(0.9))
+          nSteps <- cursor.downField("nSteps").as[Option[Int]].map(_.getOrElse(1))
+          planningSteps <- cursor.downField("planningSteps").as[Option[Int]].map(_.getOrElse(5))
+          kappa <- cursor.downField("kappa").as[Option[Double]].map(_.getOrElse(0.001))
+        } yield DynaQPlus(lr, df, planningSteps, kappa)
       case other => Left(io.circe.DecodingFailure(s"Unknown agent type: $other", cursor.history))
     }
   }
@@ -106,6 +131,21 @@ object AgentConfig {
         "learningRate" -> io.circe.Json.fromDouble(lr).getOrElse(io.circe.Json.fromDoubleOrNull(lr)),
         "discountFactor" -> io.circe.Json.fromDouble(df).getOrElse(io.circe.Json.fromDoubleOrNull(df)),
         "nSteps" -> io.circe.Json.fromInt(nSteps)
+      )
+    case DynaQ(lr, df, planningSteps) =>
+      io.circe.Json.obj(
+        "type" -> io.circe.Json.fromString("DynaQ"),
+        "learningRate" -> io.circe.Json.fromDouble(lr).getOrElse(io.circe.Json.fromDoubleOrNull(lr)),
+        "discountFactor" -> io.circe.Json.fromDouble(df).getOrElse(io.circe.Json.fromDoubleOrNull(df)),
+        "planningSteps" -> io.circe.Json.fromInt(planningSteps)
+      )
+    case DynaQPlus(lr, df, planningSteps, kappa) =>
+      io.circe.Json.obj(
+        "type" -> io.circe.Json.fromString("DynaQPlus"),
+        "learningRate" -> io.circe.Json.fromDouble(lr).getOrElse(io.circe.Json.fromDoubleOrNull(lr)),
+        "discountFactor" -> io.circe.Json.fromDouble(df).getOrElse(io.circe.Json.fromDoubleOrNull(df)),
+        "planningSteps" -> io.circe.Json.fromInt(planningSteps),
+        "kappa" -> io.circe.Json.fromDouble(kappa).getOrElse(io.circe.Json.fromDoubleOrNull(kappa))
       )
   }
 }

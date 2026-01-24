@@ -25,7 +25,7 @@ class QLearning[E <: Env[IO]](
       logger
     ) {
 
-  override protected def getNextQValue(
+  override def getNextQValue(
       nextState: E#State,
       done: Boolean,
       qValues: Map[(E#State, E#Action), Double],

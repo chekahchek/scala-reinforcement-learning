@@ -6,6 +6,8 @@ val CatsEffectVersion = "3.3.14"
 val Http4sVersion = "0.23.16"
 val CirceVersion = "0.14.1"
 val LogbackVersion = "1.4.14"
+val ScalaTestVersion = "3.2.17"
+val CatsEffectTestingVersion = "1.5.0"
 
 lazy val root = (project in file("."))
   .settings(
@@ -19,6 +21,8 @@ lazy val root = (project in file("."))
       "io.circe" %% "circe-core" % CirceVersion,
       "io.circe" %% "circe-generic" % CirceVersion,
       "io.circe" %% "circe-parser" % CirceVersion,
-      "ch.qos.logback" % "logback-classic" % LogbackVersion
+      "ch.qos.logback" % "logback-classic" % LogbackVersion,
+      "org.scalatest" %% "scalatest" % ScalaTestVersion % Test,
+      "org.typelevel" %% "cats-effect-testing-scalatest" % CatsEffectTestingVersion % Test
     )
   )

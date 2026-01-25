@@ -1,6 +1,7 @@
 package rl
 
 import cats.effect.{IO, Ref}
+import cats.effect.std.Random
 import scala.collection.mutable.Queue
 import rl.env.GridWorld1D
 import rl.agent.{Exploration, EpsilonGreedy}

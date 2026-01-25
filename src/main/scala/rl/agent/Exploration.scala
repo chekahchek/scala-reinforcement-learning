@@ -52,6 +52,10 @@ case class UCB[E <: Env[IO]](
       qValues: Map[(E#State, E#Action), Double],
       stateActionCount: Map[(E#State, E#Action), Int]
   ): E#Action = {
+
+    // UCB Formula: Argmax_a (qValue + constant * sqrt(log(totalCounts) / actionCount))
+    // totalCounts = Sum of all the counts for all actions for the given state
+    // actionCount = Count of the specific action in the given state
     val totalCounts = actionSpace
       .map(a => stateActionCount.getOrElse((state, a), 0))
       .sum

@@ -57,7 +57,7 @@ abstract class BaseDynaQ[E <: Env[IO]](
   // Override in subclasses for DynaQ+
   protected def onStepTaken(state: E#State, action: E#Action): IO[Unit] = IO.unit
 
-  protected def runStep(
+  def runStep(
       state: E#State,
       action: E#Action
   ): IO[(Boolean, E#State, Double)] = {

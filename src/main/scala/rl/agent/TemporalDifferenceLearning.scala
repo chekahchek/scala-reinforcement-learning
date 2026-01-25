@@ -96,7 +96,7 @@ abstract class TemporalDifferenceLearning[E <: Env[IO]](
     } else IO.unit
   }
 
-  protected def runStep(
+  def runStep(
       state: E#State,
       action: E#Action
   ): IO[(Boolean, E#State, Double)] = for {
